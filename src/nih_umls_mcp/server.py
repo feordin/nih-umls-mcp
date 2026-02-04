@@ -280,9 +280,11 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )]
             
     except Exception as e:
+        # Include context but avoid leaking sensitive data
+        safe_args = {k: v for k, v in arguments.items() if k.lower() not in ['apikey', 'api_key', 'password', 'token']}
         return [TextContent(
             type="text",
-            text=f"Error: {str(e)}"
+            text=f"Error calling tool '{name}' with arguments {safe_args}: {str(e)}"
         )]
 
 

@@ -13,6 +13,9 @@ class UMLSClient:
     
     Authentication is via API key which can be obtained from:
     https://uts.nlm.nih.gov/uts/signup-login
+    
+    Note: This client maintains an HTTP connection. Call close() when done,
+    or use the client as a context manager with the 'with' statement.
     """
     
     BASE_URL = "https://uts-ws.nlm.nih.gov/rest"
@@ -27,6 +30,15 @@ class UMLSClient:
         self.api_key = api_key
         self.version = version
         self.client = httpx.Client(timeout=30.0)
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures client is closed."""
+        self.close()
+        return False
     
     def _build_url(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> str:
         """Build a complete URL with API key authentication."""
