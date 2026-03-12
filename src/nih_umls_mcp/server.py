@@ -204,7 +204,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             search_type = arguments.get("search_type", "words")
             page_size = arguments.get("page_size", 10)
             
-            result = client.search(
+            result = await client.search(
                 query=query,
                 search_type=search_type,
                 page_size=page_size
@@ -217,7 +217,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         
         elif name == "get_concept":
             cui = arguments["cui"]
-            result = client.get_cui(cui)
+            result = await client.get_cui(cui)
             
             return [TextContent(
                 type="text",
@@ -226,7 +226,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         
         elif name == "get_definitions":
             cui = arguments["cui"]
-            result = client.get_definitions(cui)
+            result = await client.get_definitions(cui)
             
             return [TextContent(
                 type="text",
@@ -237,7 +237,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             cui = arguments["cui"]
             page_size = arguments.get("page_size", 10)
             
-            result = client.get_relations(cui, page_size=page_size)
+            result = await client.get_relations(cui, page_size=page_size)
             
             return [TextContent(
                 type="text",
@@ -250,7 +250,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             target_source = arguments.get("target_source")
             page_size = arguments.get("page_size", 10)
             
-            result = client.crosswalk(
+            result = await client.crosswalk(
                 source=source,
                 source_id=code,
                 target_source=target_source,
@@ -266,7 +266,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             source = arguments["source"]
             code = arguments["code"]
             
-            result = client.get_source_concept(source, code)
+            result = await client.get_source_concept(source, code)
             
             return [TextContent(
                 type="text",

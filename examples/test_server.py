@@ -20,11 +20,11 @@ async def test_server():
     print("\n1. Testing tool listing...")
     try:
         tools = await list_tools()
-        print(f"✓ Successfully listed {len(tools)} tools:")
+        print(f"[OK] Successfully listed {len(tools)} tools:")
         for tool in tools:
             print(f"  - {tool.name}: {tool.description[:60]}...")
     except Exception as e:
-        print(f"✗ Failed to list tools: {e}")
+        print(f"[FAIL] Failed to list tools: {e}")
         return
     
     # Test 2: Verify tool schemas
@@ -41,9 +41,9 @@ async def test_server():
     tool_names = [tool.name for tool in tools]
     for expected in expected_tools:
         if expected in tool_names:
-            print(f"  ✓ {expected}")
+            print(f"  [OK] {expected}")
         else:
-            print(f"  ✗ Missing tool: {expected}")
+            print(f"  [FAIL] Missing tool: {expected}")
     
     # Test 3: Check that server requires API key
     print("\n3. Testing API key requirement...")
@@ -65,13 +65,13 @@ async def test_server():
         # Check if error message mentions API key
         error_text = result[0].text
         if "UMLS_API_KEY" in error_text or "API key" in error_text:
-            print("  ✓ Server correctly requires API key")
+            print("  [OK] Server correctly requires API key")
         else:
             print(f"  ? Unexpected response: {error_text[:100]}")
             
     except Exception as e:
         if "UMLS_API_KEY" in str(e):
-            print("  ✓ Server correctly requires API key")
+            print("  [OK] Server correctly requires API key")
         else:
             print(f"  ? Unexpected error: {e}")
     finally:
