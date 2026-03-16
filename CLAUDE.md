@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MCP (Model Context Protocol) server that exposes NIH UMLS (Unified Medical Language System) REST API to AI models. Python package using `mcp` SDK and `httpx` for HTTP calls. Requires a UMLS API key via `UMLS_API_KEY` environment variable.
+MCP (Model Context Protocol) server that exposes NIH UMLS (Unified Medical Language System) REST API and NIH VSAC (Value Set Authority Center) FHIR API to AI models. Python package using `mcp` SDK and `httpx` for HTTP calls. Requires a UMLS API key via `UMLS_API_KEY` environment variable (same key works for both APIs).
 
 ## Build & Development Commands
 
@@ -30,11 +30,13 @@ python examples/client_example.py
 
 ## Architecture
 
-Two-layer design:
+Three-layer design:
 
-- **`src/nih_umls_mcp/umls_client.py`** — `UMLSClient` class: synchronous HTTP client wrapping the UMLS REST API (`https://uts-ws.nlm.nih.gov/rest`). Handles auth via API key query parameter. Supports context manager for connection cleanup. Methods: `search`, `get_cui`, `get_definitions`, `get_atoms`, `get_relations`, `get_source_concept`, `crosswalk`.
+- **`src/nih_umls_mcp/umls_client.py`** — `UMLSClient` class: async HTTP client wrapping the UMLS REST API (`https://uts-ws.nlm.nih.gov/rest`). Handles auth via API key query parameter. Methods: `search`, `get_cui`, `get_definitions`, `get_atoms`, `get_relations`, `get_source_concept`, `crosswalk`.
 
-- **`src/nih_umls_mcp/server.py`** — MCP server using `mcp.server.Server`. Defines 6 tools (`search_umls`, `get_concept`, `get_definitions`, `get_concept_relations`, `crosswalk_codes`, `get_source_concept`) via `@app.list_tools()` and `@app.call_tool()` decorators. Uses a lazily-initialized global `UMLSClient` instance. Runs over stdio transport.
+- **`src/nih_umls_mcp/vsac_client.py`** — `VSACClient` class: async HTTP client wrapping the VSAC FHIR API (`https://cts.nlm.nih.gov/fhir`). Handles auth via HTTP Basic Auth (username `apikey`, password is the UMLS key). Methods: `search_value_sets`, `get_value_set`, `expand_value_set`, `validate_code`, `lookup_code`, `subsumes`.
+
+- **`src/nih_umls_mcp/server.py`** — MCP server using `mcp.server.Server`. Defines 12 tools (6 UMLS + 6 VSAC) via `@app.list_tools()` and `@app.call_tool()` decorators. Uses lazily-initialized global `UMLSClient` and `VSACClient` instances. Runs over stdio transport.
 
 The server tool names don't map 1:1 to client method names (e.g., `get_concept` tool calls `client.get_cui()`, `crosswalk_codes` tool calls `client.crosswalk()`).
 

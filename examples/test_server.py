@@ -31,11 +31,17 @@ async def test_server():
     print("\n2. Verifying tool schemas...")
     expected_tools = [
         "search_umls",
-        "get_concept", 
+        "get_concept",
         "get_definitions",
         "get_concept_relations",
         "crosswalk_codes",
-        "get_source_concept"
+        "get_source_concept",
+        "search_value_sets",
+        "get_value_set",
+        "expand_value_set",
+        "validate_code_in_value_set",
+        "lookup_code",
+        "check_code_subsumption",
     ]
     
     tool_names = [tool.name for tool in tools]
