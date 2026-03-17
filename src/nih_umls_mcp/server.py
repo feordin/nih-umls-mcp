@@ -1,6 +1,7 @@
 """MCP Server for NIH UMLS API."""
 
 import os
+import re
 import sys
 import json
 from typing import Any, Optional
@@ -54,10 +55,12 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="search_umls",
             description=(
-                "Search the UMLS (Unified Medical Language System) for medical concepts, "
-                "terms, or codes. Returns CUIs (Concept Unique Identifiers) and basic "
-                "information about matching concepts. Useful for finding the right concept "
-                "when you have a medical term or description."
+                "Search the UMLS (Unified Medical Language System) Metathesaurus for medical concepts, "
+                "terms, or codes. Returns CUIs (Concept Unique Identifiers, e.g. C0011849) and basic "
+                "information about matching concepts. Use this tool when you have a medical term or "
+                "description and need to find its UMLS CUI identifier. For looking up codes from "
+                "specific terminologies (SNOMED CT, ICD-10, LOINC, RxNorm, CPT), use "
+                "get_source_concept (UMLS) or lookup_code (VSAC) instead."
             ),
             inputSchema={
                 "type": "object",
@@ -87,9 +90,11 @@ async def list_tools() -> list[Tool]:
             name="get_concept",
             description=(
                 "Get detailed information about a specific UMLS concept using its CUI "
-                "(Concept Unique Identifier). Returns comprehensive information including "
-                "names, semantic types, and basic relationships. Use this after finding "
-                "a CUI with search_umls."
+                "(Concept Unique Identifier, format: 'C' followed by 7 digits, e.g. C0011849). "
+                "Returns comprehensive information including names, semantic types, and basic "
+                "relationships. Use this when you already have a UMLS CUI. To look up a code "
+                "from a specific terminology (SNOMED CT, ICD-10, etc.), use get_source_concept "
+                "or lookup_code instead."
             ),
             inputSchema={
                 "type": "object",
@@ -184,9 +189,12 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="get_source_concept",
             description=(
-                "Get information about a specific code from a particular medical vocabulary. "
-                "Useful when you have a code from a specific system (like ICD-10 or SNOMED) "
-                "and want to know its meaning and associated UMLS concept."
+                "Look up a specific code from a source vocabulary (e.g., ICD-10, SNOMED CT, "
+                "RxNorm, LOINC, CPT) via the UMLS Metathesaurus. Returns the code's meaning, "
+                "associated UMLS CUI, and source-specific attributes. Use this when you have a "
+                "code and its source vocabulary abbreviation (e.g., source='ICD10CM', code='E11.9'). "
+                "For FHIR-based code lookup with code system URIs, use lookup_code instead. "
+                "Do NOT pass UMLS CUIs here — use get_concept for CUI lookups."
             ),
             inputSchema={
                 "type": "object",
@@ -207,11 +215,12 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="search_value_sets",
             description=(
-                "Search the VSAC (Value Set Authority Center) for curated value sets. "
-                "Value sets are collections of medical codes from standard code systems "
-                "(SNOMED CT, ICD-10, LOINC, CPT, RxNorm, etc.) that define clinical concepts "
-                "for quality measures, C-CDA documents, and health IT standards. "
-                "Search by title, keyword, publisher, or find value sets containing a specific code."
+                "Search the VSAC (Value Set Authority Center) for curated value sets used in "
+                "clinical quality measures (eCQMs), C-CDA documents, and health IT standards. "
+                "Value sets are groupings of terminology codes (SNOMED CT, ICD-10, LOINC, CPT, "
+                "RxNorm) — NOT UMLS CUIs. Search by title, keyword, publisher, or find value sets "
+                "containing a specific terminology code. If you need to search for a medical "
+                "concept by name and get its UMLS CUI, use search_umls instead."
             ),
             inputSchema={
                 "type": "object",
@@ -327,9 +336,15 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="lookup_code",
             description=(
-                "Look up details about a specific code in a code system via VSAC. "
+                "Look up details about a specific code in a standard terminology code system "
+                "via the VSAC FHIR API. Requires a FHIR code system URI (e.g., "
+                "'http://snomed.info/sct', 'http://hl7.org/fhir/sid/icd-10-cm', "
+                "'http://loinc.org', 'http://www.nlm.nih.gov/research/umls/rxnorm'). "
                 "Returns the code's display name, properties, and designations. "
-                "Use this for detailed code-level information from a specific code system version."
+                "This tool is for terminology codes (SNOMED, ICD-10, LOINC, RxNorm, CPT), "
+                "NOT for UMLS CUIs — if you have a CUI (format: C followed by 7 digits, "
+                "e.g. C0011849), use get_concept instead. For vocabulary-abbreviation-based "
+                "lookup (e.g., source='SNOMEDCT_US'), use get_source_concept instead."
             ),
             inputSchema={
                 "type": "object",
@@ -460,7 +475,28 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             source = arguments["source"]
             code = arguments["code"]
 
-            result = await client.get_source_concept(source, code)
+            try:
+                result = await client.get_source_concept(source, code)
+            except Exception as src_err:
+                # If lookup failed and the code looks like a UMLS CUI, provide a helpful hint
+                if re.match(r'^C\d{7}$', code):
+                    return [TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "error": str(src_err),
+                            "hint": (
+                                f"The code '{code}' was not found in source vocabulary '{source}'. "
+                                "This code matches the format of a UMLS CUI (Concept Unique "
+                                "Identifier: 'C' followed by 7 digits). If you are looking up "
+                                "a UMLS concept, use the get_concept tool instead."
+                            ),
+                            "suggestion": {
+                                "tool": "get_concept",
+                                "arguments": {"cui": code}
+                            }
+                        }, indent=2)
+                    )]
+                raise
 
             return [TextContent(
                 type="text",
@@ -516,16 +552,38 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             )]
 
         elif name == "lookup_code":
+            code = arguments["code"]
             vsac = get_vsac_client()
-            result = await vsac.lookup_code(
-                system=arguments["system"],
-                code=arguments["code"],
-                version=arguments.get("version"),
-            )
-            return [TextContent(
-                type="text",
-                text=json.dumps(result, indent=2)
-            )]
+            try:
+                result = await vsac.lookup_code(
+                    system=arguments["system"],
+                    code=code,
+                    version=arguments.get("version"),
+                )
+                return [TextContent(
+                    type="text",
+                    text=json.dumps(result, indent=2)
+                )]
+            except Exception as lookup_err:
+                # If lookup failed and the code looks like a UMLS CUI, provide a helpful hint
+                if re.match(r'^C\d{7}$', code):
+                    return [TextContent(
+                        type="text",
+                        text=json.dumps({
+                            "error": str(lookup_err),
+                            "hint": (
+                                f"The code '{code}' was not found in the specified code system. "
+                                "This code matches the format of a UMLS CUI (Concept Unique "
+                                "Identifier: 'C' followed by 7 digits). If you are looking up "
+                                "a UMLS concept, use the get_concept tool instead."
+                            ),
+                            "suggestion": {
+                                "tool": "get_concept",
+                                "arguments": {"cui": code}
+                            }
+                        }, indent=2)
+                    )]
+                raise
 
         elif name == "check_code_subsumption":
             vsac = get_vsac_client()
