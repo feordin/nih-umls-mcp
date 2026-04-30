@@ -211,6 +211,54 @@ async def list_tools() -> list[Tool]:
                 "required": ["source", "code"]
             }
         ),
+        Tool(
+            name="get_source_atoms_for_cui",
+            description=(
+                "Get atoms (source-specific codes and names) for a UMLS concept, optionally "
+                "filtered by source vocabulary and term type. Closes the loop from a UMLS CUI "
+                "back to verified source codes (RxNorm, SNOMED CT, ICD-10, LOINC, etc.). "
+                "Typical workflow: search_umls('oxybutynin') -> CUI C0069805, then "
+                "get_source_atoms_for_cui(cui='C0069805', source='RXNORM', ttys='IN') -> "
+                "RxNorm ingredient code 7807. Use this instead of guessing source codes. "
+                "Common term types: RXNORM IN (ingredient), PIN (precise ingredient), "
+                "SCD (semantic clinical drug), SBD (semantic branded drug); SNOMEDCT_US PT "
+                "(preferred term), FN (fully specified name); ICD10CM PT; LNC LC (LOINC long "
+                "common name)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "cui": {
+                        "type": "string",
+                        "description": "UMLS CUI (format: C followed by 7 digits, e.g. C0069805)"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": (
+                            "Optional source vocabulary abbreviation to filter atoms "
+                            "(e.g. RXNORM, SNOMEDCT_US, ICD10CM, LNC for LOINC). "
+                            "Comma-separated values are supported."
+                        )
+                    },
+                    "ttys": {
+                        "type": "string",
+                        "description": (
+                            "Optional comma-separated term types to filter (e.g. 'IN,SCD' for "
+                            "RxNorm ingredients and clinical drugs, 'PT,FN' for SNOMED preferred "
+                            "and fully specified names)."
+                        )
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "description": "Number of atoms to return (max 100, default 25)",
+                        "default": 25,
+                        "minimum": 1,
+                        "maximum": 100
+                    }
+                },
+                "required": ["cui"]
+            }
+        ),
         # VSAC tools
         Tool(
             name="search_value_sets",
@@ -497,6 +545,24 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                         }, indent=2)
                     )]
                 raise
+
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2)
+            )]
+
+        elif name == "get_source_atoms_for_cui":
+            cui = arguments["cui"]
+            source = arguments.get("source")
+            ttys = arguments.get("ttys")
+            page_size = arguments.get("page_size", 25)
+
+            result = await client.get_atoms(
+                cui=cui,
+                page_size=page_size,
+                sabs=source,
+                ttys=ttys,
+            )
 
             return [TextContent(
                 type="text",

@@ -109,21 +109,34 @@ class UMLSClient:
         """
         return await self._get(f"content/{self.version}/CUI/{cui}/definitions")
 
-    async def get_atoms(self, cui: str, page_size: int = 25, page_number: int = 1) -> Dict[str, Any]:
+    async def get_atoms(
+        self,
+        cui: str,
+        page_size: int = 25,
+        page_number: int = 1,
+        sabs: Optional[str] = None,
+        ttys: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Get atoms (terms) associated with a concept.
 
         Args:
             cui: Concept Unique Identifier
-            page_size: Number of results per page
+            page_size: Number of results per page (max 100)
             page_number: Page number to retrieve
+            sabs: Optional comma-separated source vocabulary filter (e.g. "RXNORM,SNOMEDCT_US")
+            ttys: Optional comma-separated term type filter (e.g. "IN,SCD" or "PT,FN")
 
         Returns:
             Atoms (terms) for the concept from various vocabularies
         """
-        params = {
-            "pageSize": min(page_size, 25),
+        params: Dict[str, Any] = {
+            "pageSize": min(page_size, 100),
             "pageNumber": page_number
         }
+        if sabs:
+            params["sabs"] = sabs
+        if ttys:
+            params["ttys"] = ttys
         return await self._get(f"content/{self.version}/CUI/{cui}/atoms", params)
 
     async def get_relations(
