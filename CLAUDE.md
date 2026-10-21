@@ -47,4 +47,4 @@ The server tool names don't map 1:1 to client method names (e.g., `get_concept` 
 - Entry point: `nih-umls-mcp` CLI command maps to `nih_umls_mcp.server:main`
 - UMLS API rate limit: 20 requests/second per IP (no client-side rate limiting implemented)
 - All API responses returned as JSON via `TextContent` objects
-- Error handler filters sensitive keys (`apikey`, `api_key`, `password`, `token`) from error messages
+- Error handler filters sensitive keys (`apikey`, `api_key`, `password`, `token`) from the echoed arguments, and passes exception text through `_redact()` so the API key (sent as a query parameter) never appears in tool output

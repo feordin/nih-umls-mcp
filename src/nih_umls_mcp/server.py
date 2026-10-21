@@ -32,6 +32,13 @@ def _get_api_key() -> str:
     return api_key
 
 
+def _redact(text: str) -> str:
+    """Strip the API key from error text (httpx errors include the full request URL)."""
+    text = re.sub(r'(apiKey=)[^&\s\'"]+', r'\1REDACTED', text)
+    key = os.getenv("UMLS_API_KEY")
+    return text.replace(key, "REDACTED") if key else text
+
+
 def get_client() -> UMLSClient:
     """Get or initialize the UMLS client."""
     global umls_client
@@ -531,7 +538,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                     return [TextContent(
                         type="text",
                         text=json.dumps({
-                            "error": str(src_err),
+                            "error": _redact(str(src_err)),
                             "hint": (
                                 f"The code '{code}' was not found in source vocabulary '{source}'. "
                                 "This code matches the format of a UMLS CUI (Concept Unique "
@@ -636,7 +643,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
                     return [TextContent(
                         type="text",
                         text=json.dumps({
-                            "error": str(lookup_err),
+                            "error": _redact(str(lookup_err)),
                             "hint": (
                                 f"The code '{code}' was not found in the specified code system. "
                                 "This code matches the format of a UMLS CUI (Concept Unique "
@@ -674,7 +681,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         safe_args = {k: v for k, v in arguments.items() if k.lower() not in ['apikey', 'api_key', 'password', 'token']}
         return [TextContent(
             type="text",
-            text=f"Error calling tool '{name}' with arguments {safe_args}: {str(e)}"
+            text=f"Error calling tool '{name}' with arguments {safe_args}: {_redact(str(e))}"
         )]
 
 
